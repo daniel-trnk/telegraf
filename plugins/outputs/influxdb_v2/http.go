@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/alitto/pond/v2"
@@ -328,6 +329,15 @@ func (c *httpClient) writeBatch(ctx context.Context, b *batch) error {
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		internal.OnClientError(c.client, err)
+		// If the error is not a connection refused error, we will retry after a default timeout.
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			retryDuration := time.Duration(defaultMaxWaitRetryAfterSeconds) * time.Second
+			return &ThrottleError{
+				Err:        fmt.Errorf("failed to write to %s - connection refused; will retry in %s. (%s)", b.bucket, retryDuration, resp.Status),
+				StatusCode: resp.StatusCode,
+				RetryAfter: retryDuration,
+			}
+		}
 		return err
 	}
 	defer resp.Body.Close()
