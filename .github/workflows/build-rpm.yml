@@ -96,7 +96,7 @@ jobs:
           repo_root="/var/www/lighttpd/rpmrepos"
           repo_dir="${repo_root}/telegraf-${{ matrix.rpm_arch }}"
 
-          sudo mkdir -p "${repo_dir}"
+          mkdir -p "${repo_dir}"
 
           shopt -s nullglob
           rpms=(./rpms/*.rpm)
@@ -105,12 +105,12 @@ jobs:
             exit 1
           fi
 
-          sudo cp -f ./rpms/*.rpm "${repo_dir}/"
+          cp -f ./rpms/*.rpm "${repo_dir}/"
 
           if command -v createrepo_c >/dev/null 2>&1; then
-            sudo createrepo_c --update "${repo_dir}"
+            createrepo_c --update "${repo_dir}"
           elif command -v createrepo >/dev/null 2>&1; then
-            sudo createrepo --update "${repo_dir}"
+            createrepo --update "${repo_dir}"
           else
             echo "Neither createrepo_c nor createrepo is available on this runner"
             exit 1
