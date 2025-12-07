@@ -1,0 +1,67 @@
+name: Build RPM Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-rpm:
+    name: Build RPM Packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - name: amd64
+            rpm_arch: x86_64
+            goarch: amd64
+          - name: arm64
+            rpm_arch: aarch64
+            goarch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            rpm \
+            ruby \
+            ruby-dev \
+            build-essential \
+            git \
+            make
+
+      - name: Install fpm
+        run: |
+          sudo gem install fpm
+
+      - name: Build RPM package
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch.goarch }}
+        run: |
+          make docs config
+          make ${{ matrix.arch.rpm_arch }}.rpm
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegraf-${{ matrix.arch.rpm_arch }}.rpm
+          path: build/dist/telegraf-*.${{ matrix.arch.rpm_arch }}.rpm
+          retention-days: 30
+
