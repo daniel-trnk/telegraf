@@ -13,16 +13,18 @@ permissions:
 jobs:
   build-rpm:
     name: Build RPM Packages
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch:
           - name: amd64
             rpm_arch: x86_64
             goarch: amd64
+            runner: ubuntu-latest
           - name: arm64
             rpm_arch: aarch64
             goarch: arm64
+            runner: ubuntu-22.04-arm64
+    runs-on: ${{ matrix.arch.runner }}
 
     steps:
       - name: Checkout code
