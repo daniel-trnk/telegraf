@@ -23,7 +23,8 @@ jobs:
           - name: arm64
             rpm_arch: aarch64
             goarch: arm64
-            runner: ubuntu-24.04-arm
+            # runner: ubuntu-24.04-arm
+            runner: github-4cpu-16GB-arm-ubuntu-24.04
     runs-on: ${{ matrix.arch.runner }}
 
     steps:
@@ -66,4 +67,52 @@ jobs:
           name: telegraf-${{ matrix.arch.rpm_arch }}.rpm
           path: build/dist/telegraf-*.${{ matrix.arch.rpm_arch }}.rpm
           retention-days: 30
+
+  publish-rpmrepo:
+    name: Publish RPMs to rpmrepo + update metadata
+    needs: build-rpm
+    strategy:
+      fail-fast: false
+      matrix:
+        rpm_arch:
+          - x86_64
+          - aarch64
+    runs-on:
+      - self-hosted
+      - rpmrepo
+
+    steps:
+      - name: Download RPM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: telegraf-${{ matrix.rpm_arch }}.rpm
+          path: ./rpms
+
+      - name: Copy RPMs into repo + run createrepo --update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repo_root="/var/www/lighttpd/rpmrepos"
+          repo_dir="${repo_root}/telegraf-${{ matrix.rpm_arch }}"
+
+          sudo mkdir -p "${repo_dir}"
+
+          shopt -s nullglob
+          rpms=(./rpms/*.rpm)
+          if [[ ${#rpms[@]} -eq 0 ]]; then
+            echo "No RPMs found in ./rpms for ${{ matrix.rpm_arch }}"
+            exit 1
+          fi
+
+          sudo cp -f ./rpms/*.rpm "${repo_dir}/"
+
+          if command -v createrepo_c >/dev/null 2>&1; then
+            sudo createrepo_c --update "${repo_dir}"
+          elif command -v createrepo >/dev/null 2>&1; then
+            sudo createrepo --update "${repo_dir}"
+          else
+            echo "Neither createrepo_c nor createrepo is available on this runner"
+            exit 1
+          fi
 
